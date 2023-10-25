@@ -20,6 +20,9 @@ class UserService {
       options: { expiresIn: process.env.REFRESH_TOKEN_EXPIRE_IN }
     })
   }
+  private signAccessAndRefreshToken(user_id: string) {
+    return Promise.all([this.signAccessToken(user_id), this.signRefreshToken(user_id)])
+  }
   async register(payload: RegisterReqBody) {
     const result = await databaseService.users.insertOne(
       new User({ ...payload, date_of_birth: new Date(payload.date_of_birth), password: hashPassword(payload.password) }) // override lại date_of_birth, ép kiểu từ stirng về date
@@ -27,13 +30,10 @@ class UserService {
 
     // lấy user_id từ account vừa tạo
     // result này có insertedId là của mongodb
-    const user_id = result.insertedId.toString()
+    const user_id = result.insertedId.toString() // lấy user_id từ id mà mongodb đã tạo ra sẵn
     // từ user_id tạo ra access token và refresh token
     // dùng promise.all để chạy song song 2 hàm signAccessToken và signRefreshToken
-    const [access_token, refresh_token] = await Promise.all([
-      this.signAccessToken(user_id),
-      this.signRefreshToken(user_id)
-    ])
+    const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id)
 
     return { access_token, refresh_token }
   }
@@ -43,6 +43,12 @@ class UserService {
     // vào database tìm user có email này không
     const user = await databaseService.users.findOne({ email })
     return Boolean(user) // nếu tìm được thì true còn không thì false (vì giá trị nhận được là null)
+  }
+  async login(user_id: string) {
+    // dùng user_id để tạo access_token và refresh_token
+    // return access_token và refresh_token cho controller
+    const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id)
+    return { access_token, refresh_token }
   }
 }
 const userService = new UserService()
