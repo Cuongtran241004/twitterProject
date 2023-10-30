@@ -17,7 +17,7 @@ app.get('/', (req, res) => {
 app.use('/users', usersRouter)
 //localhost:3000/users/tweets
 
-//app sử dụng một error handler tổng
+// app sử dụng một error handler tổng
 // hạn chế dùng try catch khi gặp một lỗi bất kì
 app.use(defaultErrorHandler)
 

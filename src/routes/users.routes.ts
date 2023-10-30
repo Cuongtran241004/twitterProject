@@ -4,12 +4,21 @@ import { loginValidator, registerValidator } from '~/middlewares/users.middlewar
 import { loginController, registerController } from '~/controllers/users.controllers'
 import { register } from 'module'
 import { wrapAsync } from '~/utils/handlers'
+import { logoutController } from '~/controllers/users.controllers'
+import { accessTokenValidator, refreshTokenValidator } from '~/middlewares/users.middlewares'
 const usersRouter = Router()
 
 // controller
 usersRouter.get('/login', loginValidator, wrapAsync(loginController))
 usersRouter.post('/register', registerValidator, wrapAsync(registerController))
-
+/**
+ * description: Logout
+ * path: /users/logout
+ * method: POST
+ * Header: { Authorization: 'Bearer <access_token>' }
+ * Body: {refresh_token: string} // mỗi thiết bị sẽ có 1 refresh_token
+ */
+usersRouter.post('/logout', accessTokenValidator, refreshTokenValidator, wrapAsync(logoutController))
 // usersRouter.post(
 //   '/register',
 //   registerValidator,

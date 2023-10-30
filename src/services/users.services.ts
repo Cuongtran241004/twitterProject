@@ -5,6 +5,9 @@ import { hashPassword } from '~/utils/crypto'
 import { signToken } from '~/utils/jwt'
 import { TokenType } from '~/constants/enums'
 import { config } from 'dotenv'
+import { ObjectId } from 'mongodb'
+import RefreshToken from '~/models/schemas/RefreshToken.schema'
+import { USERS_MESSAGES } from '~/constants/messages'
 config()
 class UserService {
   private signAccessToken(user_id: string) {
@@ -34,7 +37,9 @@ class UserService {
     // từ user_id tạo ra access token và refresh token
     // dùng promise.all để chạy song song 2 hàm signAccessToken và signRefreshToken
     const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id)
-
+    await databaseService.refreshTokens.insertOne(
+      new RefreshToken({ token: refresh_token, user_id: new ObjectId(user_id) })
+    )
     return { access_token, refresh_token }
   }
 
@@ -48,7 +53,18 @@ class UserService {
     // dùng user_id để tạo access_token và refresh_token
     // return access_token và refresh_token cho controller
     const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id)
+    await databaseService.refreshTokens.insertOne(
+      new RefreshToken({ token: refresh_token, user_id: new ObjectId(user_id) })
+    )
     return { access_token, refresh_token }
+    // thiếu bước lưu token vào database
+  }
+  async logout(refresh_token: string) {
+    // tìm và xóa refresh token trong database
+    await databaseService.refreshTokens.deleteOne({ token: refresh_token })
+    return {
+      message: USERS_MESSAGES.LOGOUT_SUCCESS
+    }
   }
 }
 const userService = new UserService()
