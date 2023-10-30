@@ -5,9 +5,19 @@ import { loginController, registerController } from '~/controllers/users.control
 import { register } from 'module'
 import { wrapAsync } from '~/utils/handlers'
 import { logoutController } from '~/controllers/users.controllers'
-import { accessTokenValidator, refreshTokenValidator } from '~/middlewares/users.middlewares'
+import {
+  accessTokenValidator,
+  refreshTokenValidator,
+  forgotPasswordValidator,
+  verifyForgotPasswordTokenValidator
+} from '~/middlewares/users.middlewares'
 import { emailVerifyValidator } from '~/middlewares/users.middlewares'
-import { emailVerifyController } from '~/controllers/users.controllers'
+import {
+  emailVerifyController,
+  resendEmailVerifyController,
+  forgotPasswordController,
+  verifyForgotPasswordTokenController
+} from '~/controllers/users.controllers'
 const usersRouter = Router()
 
 // controller
@@ -31,6 +41,37 @@ usersRouter.post('/logout', accessTokenValidator, refreshTokenValidator, wrapAsy
  * body: { email_verify_token: string }
  */
 usersRouter.post('/verify-email', emailVerifyValidator, wrapAsync(emailVerifyController))
+
+/**
+ * des: resend email verify
+ * method: POST
+ * header: {Authorization: Bearer <access_token>}
+ */
+usersRouter.post('/resend-email-verify', accessTokenValidator, wrapAsync(resendEmailVerifyController))
+
+/**
+ * des: forgot password
+ * khi người dùng quên mật khẩu, họ sẽ gửi 1 request với email của họ
+ * server sẽ tạo 1 forgot_password_token và gửi vào email của họ
+ * method: POST
+ * path: /users/forgot-password
+ * body: { email: string }
+ */
+usersRouter.post('/forgot-password', forgotPasswordValidator, wrapAsync(forgotPasswordController))
+
+/**
+ * des: verify forgot password token
+ * người dùng sau khi báo forgot password, họ sẽ nhận được 1 email với link verify forgot password token
+ * nếu thành công thì họ sẽ được reset password
+ * method: POST
+ * path: /users/verify-forgot-password-token
+ * body: { forgot_password_token: string }
+ */
+usersRouter.post(
+  '/verify-forgot-password',
+  verifyForgotPasswordTokenValidator,
+  wrapAsync(verifyForgotPasswordTokenController)
+)
 // usersRouter.post(
 //   '/register',
 //   registerValidator,

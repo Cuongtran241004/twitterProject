@@ -3,10 +3,17 @@ import User from '~/models/schemas/User.schema'
 import databaseService from '~/services/database.services'
 import userService from '~/services/users.services'
 import { ParamsDictionary } from 'express-serve-static-core'
-import { EmailVerifyReqBody, LoginReqBody, RegisterReqBody, TokenPayload } from '~/models/requests/User.request'
+import {
+  EmailVerifyReqBody,
+  ForgotPasswordReqBody,
+  LoginReqBody,
+  RegisterReqBody,
+  TokenPayload
+} from '~/models/requests/User.request'
 import { ObjectId } from 'mongodb'
 import { USERS_MESSAGES } from '~/constants/messages'
 import HTTP_STATUS from '~/constants/httpStatus'
+import { UserVerifyStatus } from '~/constants/enums'
 
 export const loginController = async (req: Request, res: Response) => {
   // vào req lấy user ra, và lấy _id của user đó
@@ -72,4 +79,37 @@ export const emailVerifyController = async (req: Request<ParamsDictionary, any, 
     message: USERS_MESSAGES.EMAIL_VERIFY_SUCCESS,
     result
   })
+}
+export const resendEmailVerifyController = async (req: Request, res: Response) => {
+  // nếu qua được hàm này thì đã qua được accessTokenValidator
+  // req đã có decoded_authorization
+  const { user_id } = req.decoded_authorization as TokenPayload
+  // tìm user có user_id này
+  const user = await databaseService.users.findOne({
+    _id: new ObjectId(user_id)
+  })
+  // nếu không có user này thì trả về lỗi
+  if (!user) {
+    return res.status(HTTP_STATUS.NOT_FOUND).json({ message: USERS_MESSAGES.USER_NOT_FOUND })
+  }
+  // nếu có user này thì kiểm tra xem user này đã verify email chưa
+  if (user.verify === UserVerifyStatus.Verified) {
+    return res.json({ message: USERS_MESSAGES.EMAIL_ALREADY_VERIFIED_BEFORE })
+  }
+  // nếu chưa verify thì gửi lại email verify
+  const result = await userService.resendEmailVerify(user_id)
+  return res.json({ result })
+}
+export const forgotPasswordController = async (
+  req: Request<ParamsDictionary, any, ForgotPasswordReqBody>,
+  res: Response
+) => {
+  // vì đã qua forgotPasswordValidator nên đã có user trong req
+  const { _id } = req.user as User
+  // tiến hành tạo forgot_password_token và gửi vào email của user
+  const result = await userService.forgotPassword((_id as ObjectId).toString())
+  return res.json({ result })
+}
+export const verifyForgotPasswordTokenController = async (req: Request, res: Response) => {
+  res.json({ message: USERS_MESSAGES.VERIFY_FORGOT_PASSWORD_TOKEN_SUCCESS })
 }
