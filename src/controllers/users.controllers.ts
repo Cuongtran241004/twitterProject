@@ -8,6 +8,7 @@ import {
   ForgotPasswordReqBody,
   LoginReqBody,
   RegisterReqBody,
+  ResetPasswordReqBody,
   TokenPayload
 } from '~/models/requests/User.request'
 import { ObjectId } from 'mongodb'
@@ -112,4 +113,25 @@ export const forgotPasswordController = async (
 }
 export const verifyForgotPasswordTokenController = async (req: Request, res: Response) => {
   res.json({ message: USERS_MESSAGES.VERIFY_FORGOT_PASSWORD_TOKEN_SUCCESS })
+}
+// nên định nghĩa req body khi controller sử dụng body
+export const resetPasswordController = async (
+  req: Request<ParamsDictionary, any, ResetPasswordReqBody>,
+  res: Response
+) => {
+  const { user_id } = req.decoded_forgot_password_token as TokenPayload
+  const { password } = req.body
+  // dủng user_id đó để tìm user và update lại password
+  const result = await userService.resetPassword({ user_id, password })
+  return res.json(result)
+}
+
+export const getMeController = async (req: Request, res: Response) => {
+  const { user_id } = req.decoded_authorization as TokenPayload
+  // vào database tìm user có user_id mà đưa cho client
+  const user = await userService.getMe(user_id)
+  return res.json({
+    message: USERS_MESSAGES.GET_ME_SUCCESS,
+    result: user
+  })
 }

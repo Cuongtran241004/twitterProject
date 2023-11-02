@@ -11,12 +11,14 @@ import {
   forgotPasswordValidator,
   verifyForgotPasswordTokenValidator
 } from '~/middlewares/users.middlewares'
-import { emailVerifyValidator } from '~/middlewares/users.middlewares'
+import { emailVerifyValidator, resetPasswordValidator } from '~/middlewares/users.middlewares'
 import {
   emailVerifyController,
   resendEmailVerifyController,
   forgotPasswordController,
-  verifyForgotPasswordTokenController
+  verifyForgotPasswordTokenController,
+  resetPasswordController,
+  getMeController
 } from '~/controllers/users.controllers'
 const usersRouter = Router()
 
@@ -72,6 +74,27 @@ usersRouter.post(
   verifyForgotPasswordTokenValidator,
   wrapAsync(verifyForgotPasswordTokenController)
 )
+/*
+des: reset password
+path: '/reset-password'
+method: POST
+Header: không cần, vì  ngta quên mật khẩu rồi, thì sao mà đăng nhập để có authen đc
+body: {forgot_password_token: string, password: string, confirm_password: string}
+*/
+usersRouter.post(
+  '/reset-password',
+  resetPasswordValidator,
+  verifyForgotPasswordTokenValidator,
+  wrapAsync(resetPasswordController)
+)
+/*
+des: get profile của user
+path: '/me'
+method: get
+Header: {Authorization: Bearer <access_token>}
+body: {}
+*/
+usersRouter.get('/me', accessTokenValidator, wrapAsync(getMeController))
 // usersRouter.post(
 //   '/register',
 //   registerValidator,
