@@ -44,5 +44,22 @@ export const USERS_MESSAGES = {
   FORGOT_PASSWORD_TOKEN_IS_INVALID: 'Forgot password token is invalid',
   VERIFY_FORGOT_PASSWORD_TOKEN_SUCCESS: 'Verify forgot password token successfully',
   RESET_PASSWORD_SUCCESS: 'Reset password successfully',
-  GET_ME_SUCCESS: 'Get me successfully'
+  GET_ME_SUCCESS: 'Get me successfully',
+  USER_IS_NOT_VERIFIED: 'User is not verified',
+  IMAGE_MUST_BE_A_STRING: 'Image must be a string',
+  IMAGE_LENGTH_MUST_BE_FROM_1_TO_400: 'Image length must be from 1 to 400',
+  BIO_MUST_BE_A_STRING: 'Bio must be a string',
+  BIO_LENGTH_MUST_BE_LESS_THAN_200: 'Bio length must be less than 200',
+  LOCATION_MUST_BE_A_STRING: 'Location must be a string',
+  LOCATION_LENGTH_MUST_BE_LESS_THAN_200: 'Location length must be less than 200',
+  WEBSITE_MUST_BE_A_STRING: 'Website must be a string',
+  WEBSITE_LENGTH_MUST_BE_LESS_THAN_200: 'Website length must be less than 200',
+  USERNAME_MUST_BE_A_STRING: 'Username must be a string',
+  USERNAME_LENGTH_MUST_BE_LESS_THAN_50: 'Username length must be less than 50',
+  UPDATE_ME_SUCCESS: 'Update me successfully',
+  GET_PROFILE_SUCCESS: 'Get profile successfully',
+  INVALID_FOLLOWED_USER_ID: 'Invalid followed user id',
+  FOLLOWED_USER_NOT_FOUND: 'Followed user not found',
+  FOLLOWED: 'Followed',
+  FOLLOW_SUCCESS: 'Follow successfully'
 } as const

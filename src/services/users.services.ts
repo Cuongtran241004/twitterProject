@@ -1,6 +1,6 @@
 import User from '~/models/schemas/User.schema'
 import databaseService from '~/services/database.services'
-import { RegisterReqBody } from '~/models/requests/User.request'
+import { RegisterReqBody, UpdateMeReqBody } from '~/models/requests/User.request'
 import { hashPassword } from '~/utils/crypto'
 import { signToken } from '~/utils/jwt'
 import { TokenType, UserVerifyStatus } from '~/constants/enums'
@@ -9,48 +9,56 @@ import { ObjectId } from 'mongodb'
 import RefreshToken from '~/models/schemas/RefreshToken.schema'
 import { USERS_MESSAGES } from '~/constants/messages'
 import { log } from 'console'
+import { ErrorWithStatus } from '~/models/Errors'
+import HTTP_STATUS from '~/constants/httpStatus'
+import { Follower } from '~/models/schemas/Followers.schema'
 config()
 class UserService {
-  private signAccessToken(user_id: string) {
+  private signAccessToken({ user_id, verify }: { user_id: string; verify: UserVerifyStatus }) {
     return signToken({
-      payload: { user_id, token_type: TokenType.AccessToken },
+      payload: { user_id, token_type: TokenType.AccessToken, verify },
       options: { expiresIn: process.env.ACCESS_TOKEN_EXPIRE_IN },
       privateKey: process.env.JWT_SECRET_ACCESS_TOKEN as string
     })
   }
 
-  private signRefreshToken(user_id: string) {
+  private signRefreshToken({ user_id, verify }: { user_id: string; verify: UserVerifyStatus }) {
     return signToken({
-      payload: { user_id, token_type: TokenType.RefreshToken },
+      payload: { user_id, token_type: TokenType.RefreshToken, verify },
       privateKey: process.env.JWT_SECRET_REFRESH_TOKEN as string,
       options: { expiresIn: process.env.REFRESH_TOKEN_EXPIRE_IN }
     })
   }
-  private signEmailVerifyToken(user_id: string) {
+  private signEmailVerifyToken({ user_id, verify }: { user_id: string; verify: UserVerifyStatus }) {
     return signToken({
-      payload: { user_id, token_type: TokenType.EmailVerificationToken },
+      payload: { user_id, token_type: TokenType.EmailVerificationToken, verify },
       privateKey: process.env.JWT_SECRET_EMAIL_VERIFY_TOKEN as string,
       options: { expiresIn: process.env.EMAIL_VERIFY_TOKEN_EXPIRE_IN }
     })
   }
-  private signForgotPasswordToken(user_id: string) {
+  private signForgotPasswordToken({ user_id, verify }: { user_id: string; verify: UserVerifyStatus }) {
     return signToken({
-      payload: { user_id, token_type: TokenType.ForgotPasswordToken },
+      payload: { user_id, token_type: TokenType.ForgotPasswordToken, verify },
       privateKey: process.env.JWT_SECRET_FORGOT_PASSWORD_TOKEN as string,
       options: { expiresIn: process.env.FORGOT_PASSWORD_TOKEN_EXPIRE_IN }
     })
   }
-  private signAccessAndRefreshToken(user_id: string) {
-    return Promise.all([this.signAccessToken(user_id), this.signRefreshToken(user_id)])
+  private signAccessAndRefreshToken({ user_id, verify }: { user_id: string; verify: UserVerifyStatus }) {
+    return Promise.all([this.signAccessToken({ user_id, verify }), this.signRefreshToken({ user_id, verify })])
   }
+
   async register(payload: RegisterReqBody) {
     const user_id = new ObjectId() // tạo user_id
-    const email_verify_token = await this.signEmailVerifyToken(user_id.toString()) // tạo email_verify_token
+    const email_verify_token = await this.signEmailVerifyToken({
+      user_id: user_id.toString(),
+      verify: UserVerifyStatus.Unverified
+    }) // tạo email_verify_token
     const result = await databaseService.users.insertOne(
       new User({
         ...payload,
         _id: user_id,
         email_verify_token,
+        username: `user${user_id.toString()}`,
         date_of_birth: new Date(payload.date_of_birth),
         password: hashPassword(payload.password)
       }) // override lại date_of_birth, ép kiểu từ stirng về date
@@ -58,7 +66,10 @@ class UserService {
 
     // từ user_id tạo ra access token và refresh token
     // dùng promise.all để chạy song song 2 hàm signAccessToken và signRefreshToken
-    const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id.toString())
+    const [access_token, refresh_token] = await this.signAccessAndRefreshToken({
+      user_id: user_id.toString(),
+      verify: UserVerifyStatus.Unverified
+    })
     await databaseService.refreshTokens.insertOne(
       new RefreshToken({ token: refresh_token, user_id: new ObjectId(user_id) })
     )
@@ -74,10 +85,13 @@ class UserService {
     const user = await databaseService.users.findOne({ email })
     return Boolean(user) // nếu tìm được thì true còn không thì false (vì giá trị nhận được là null)
   }
-  async login(user_id: string) {
+  async login({ user_id, verify }: { user_id: string; verify: UserVerifyStatus }) {
     // dùng user_id để tạo access_token và refresh_token
     // return access_token và refresh_token cho controller
-    const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id)
+    const [access_token, refresh_token] = await this.signAccessAndRefreshToken({
+      user_id,
+      verify
+    })
     await databaseService.refreshTokens.insertOne(
       new RefreshToken({ token: refresh_token, user_id: new ObjectId(user_id) })
     )
@@ -96,7 +110,7 @@ class UserService {
     // tạo access_token và refresh_token gui về cho user và lưu vào database
     // đồng thời tìm user và update lại email_verify_token thành '', verify: 1, update_at: Date.now()
     const [token] = await Promise.all([
-      this.signAccessAndRefreshToken(user_id),
+      this.signAccessAndRefreshToken({ user_id, verify: UserVerifyStatus.Verified }),
       databaseService.users.updateOne(
         {
           _id: new ObjectId(user_id)
@@ -121,7 +135,7 @@ class UserService {
   }
   async resendEmailVerify(user_id: string) {
     // tạo email_verify_token mới
-    const email_verify_token = await this.signEmailVerifyToken(user_id)
+    const email_verify_token = await this.signEmailVerifyToken({ user_id, verify: UserVerifyStatus.Unverified })
     // tìm user và update lại email_verify_token
     await databaseService.users.updateOne(
       {
@@ -142,9 +156,9 @@ class UserService {
       message: USERS_MESSAGES.RESEND_EMAIL_VERIFY_SUCCESS
     }
   }
-  async forgotPassword(user_id: string) {
+  async forgotPassword({ user_id, verify }: { user_id: string; verify: UserVerifyStatus }) {
     // tạo forgot_password_token
-    const forgot_password_token = await this.signForgotPasswordToken(user_id)
+    const forgot_password_token = await this.signForgotPasswordToken({ user_id, verify })
     // update lại user bằng forgot_password_token và updated_at vào database
     await databaseService.users.updateOne({ _id: new ObjectId(user_id) }, [
       {
@@ -187,6 +201,78 @@ class UserService {
       }
     )
     return user
+  }
+  async updateMe(user_id: string, payload: UpdateMeReqBody) {
+    // chuyển dat_of_birth từ string sang date để lưu trữ trong database
+    const _payload = payload.date_of_birth ? { ...payload, date_of_birth: new Date(payload.date_of_birth) } : payload
+    const user = await databaseService.users.findOneAndUpdate(
+      { _id: new ObjectId(user_id) },
+      [
+        {
+          $set: {
+            ...payload,
+            updated_at: '$$NOW'
+          }
+        }
+      ],
+      {
+        // trả về document mới sau khi update
+        returnDocument: 'after',
+        projection: {
+          password: 0,
+          email_verify_token: 0,
+          forgot_password_token: 0,
+          refresh_tokens: 0
+        }
+      }
+    )
+    return user.value
+  }
+  async getProfile(username: string) {
+    const user = await databaseService.users.findOne(
+      { username },
+      {
+        projection: {
+          password: 0,
+          email_verify_token: 0,
+          forgot_password_token: 0,
+          refresh_tokens: 0,
+          verify: 0,
+          created_at: 0,
+          update_at: 0
+        }
+      }
+    )
+    if (!user) {
+      throw new ErrorWithStatus({
+        message: USERS_MESSAGES.USER_NOT_FOUND,
+        status: HTTP_STATUS.NOT_FOUND
+      })
+    }
+    return user
+  }
+  async follow(user_id: string, followed_user_id: string) {
+    //kiểm tra xem đã follow hay chưa
+    const isFollowed = await databaseService.followers.findOne({
+      user_id: new ObjectId(user_id),
+      followed_user_id: new ObjectId(followed_user_id)
+    })
+    //nếu đã follow thì return message là đã follow
+    if (isFollowed != null) {
+      return {
+        message: USERS_MESSAGES.FOLLOWED
+      }
+    }
+    //chưa thì thêm 1 document vào collection followers
+    await databaseService.followers.insertOne(
+      new Follower({
+        user_id: new ObjectId(user_id),
+        followed_user_id: new ObjectId(followed_user_id)
+      })
+    )
+    return {
+      message: USERS_MESSAGES.FOLLOW_SUCCESS
+    }
   }
 }
 

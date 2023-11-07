@@ -1,29 +1,39 @@
 // những bộ api nào liên quan đến users thì đều lưu được ở file này
 import { Router } from 'express'
-import { loginValidator, registerValidator } from '~/middlewares/users.middlewares'
-import { loginController, registerController } from '~/controllers/users.controllers'
 import { register } from 'module'
 import { wrapAsync } from '~/utils/handlers'
 import { logoutController } from '~/controllers/users.controllers'
 import {
+  loginValidator,
+  registerValidator,
   accessTokenValidator,
   refreshTokenValidator,
   forgotPasswordValidator,
-  verifyForgotPasswordTokenValidator
+  verifyForgotPasswordTokenValidator,
+  verifiedUserValidator,
+  updateMeValidator,
+  followValidator
 } from '~/middlewares/users.middlewares'
 import { emailVerifyValidator, resetPasswordValidator } from '~/middlewares/users.middlewares'
 import {
+  loginController,
+  registerController,
   emailVerifyController,
   resendEmailVerifyController,
   forgotPasswordController,
   verifyForgotPasswordTokenController,
   resetPasswordController,
-  getMeController
+  getMeController,
+  updateMeController,
+  getProfileController,
+  followController
 } from '~/controllers/users.controllers'
+import { filterMiddleware } from '~/middlewares/common.middlewares'
+import { UpdateMeReqBody } from '~/models/requests/User.request'
 const usersRouter = Router()
 
 // controller
-usersRouter.get('/login', loginValidator, wrapAsync(loginController))
+usersRouter.post('/login', loginValidator, wrapAsync(loginController))
 usersRouter.post('/register', registerValidator, wrapAsync(registerController))
 /**
  * description: Logout
@@ -95,6 +105,42 @@ Header: {Authorization: Bearer <access_token>}
 body: {}
 */
 usersRouter.get('/me', accessTokenValidator, wrapAsync(getMeController))
+
+usersRouter.patch(
+  '/me',
+  accessTokenValidator,
+  verifiedUserValidator,
+  filterMiddleware<UpdateMeReqBody>([
+    'name',
+    'date_of_birth',
+    'bio',
+    'location',
+    'website',
+    'avatar',
+    'username',
+    'cover_photo'
+  ]),
+  updateMeValidator,
+  wrapAsync(updateMeController)
+)
+
+/*
+des: get profile của user khác bằng unsername
+path: '/:username'
+method: get
+không cần header vì, chưa đăng nhập cũng có thể xem
+*/
+usersRouter.get('/:username', wrapAsync(getProfileController))
+
+/*
+des: Follow someone
+path: '/follow'
+method: post
+headers: {Authorization: Bearer <access_token>}
+body: {followed_user_id: string}
+*/
+usersRouter.post('/follow', accessTokenValidator, verifiedUserValidator, followValidator, wrapAsync(followController))
+//chưa có controller getProfileController, nên bây giờ ta làm
 // usersRouter.post(
 //   '/register',
 //   registerValidator,
