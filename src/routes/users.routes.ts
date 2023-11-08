@@ -31,7 +31,8 @@ import {
   followController,
   unfollowController,
   changePasswordController,
-  refreshTokenController
+  refreshTokenController,
+  oAuthController
 } from '~/controllers/users.controllers'
 import { filterMiddleware } from '~/middlewares/common.middlewares'
 import { UpdateMeReqBody } from '~/models/requests/User.request'
@@ -189,6 +190,7 @@ g}
 usersRouter.post('/refresh-token', refreshTokenValidator, wrapAsync(refreshTokenController))
 //khỏi kiểm tra accesstoken, tại nó hết hạn rồi mà
 
+usersRouter.get('/oauth/google', wrapAsync(oAuthController))
 //chưa có controller getProfileController, nên bây giờ ta làm
 // usersRouter.post(
 //   '/register',
