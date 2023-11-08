@@ -19,6 +19,7 @@ import { JsonWebTokenError } from 'jsonwebtoken'
 import { ObjectId } from 'mongodb'
 import { TokenPayload } from '~/models/requests/User.request'
 import { UserVerifyStatus } from '~/constants/enums'
+import { REGEX_USERNAME } from '~/constants/regex'
 // Express sẽ có các interface để định nghĩa req, res, next
 
 const passwordSchema: ParamSchema = {
@@ -47,7 +48,7 @@ const passwordSchema: ParamSchema = {
   errorMessage: USERS_MESSAGES.PASSWORD_MUST_BE_STRONG
 }
 
-const confirm_passwordSchema: ParamSchema = {
+const confirmPasswordSchema: ParamSchema = {
   notEmpty: {
     errorMessage: USERS_MESSAGES.CONFIRM_PASSWORD_IS_REQUIRED
   },
@@ -205,7 +206,7 @@ export const registerValidator = validate(
         }
       },
       password: passwordSchema,
-      confirm_password: confirm_passwordSchema,
+      confirm_password: confirmPasswordSchema,
       date_of_birth: dateOfBirthSchema
     },
     ['body']
@@ -421,7 +422,7 @@ export const resetPasswordValidator = validate(
   checkSchema(
     {
       password: passwordSchema,
-      confirm_password: confirm_passwordSchema
+      confirm_password: confirmPasswordSchema
     },
     ['body']
   )
@@ -504,12 +505,22 @@ export const updateMeValidator = validate(
           errorMessage: USERS_MESSAGES.USERNAME_MUST_BE_A_STRING ////messages.ts thêm USERNAME_MUST_BE_A_STRING: 'Username must be a string'
         },
         trim: true,
-        isLength: {
-          options: {
-            min: 1,
-            max: 50
-          },
-          errorMessage: USERS_MESSAGES.USERNAME_LENGTH_MUST_BE_LESS_THAN_50 //messages.ts thêm USERNAME_LENGTH_MUST_BE_LESS_THAN_50: 'Username length must be less than 50'
+        //bỏ isLength,vì ta có regex rồi
+        custom: {
+          options: async (value, { req }) => {
+            if (REGEX_USERNAME.test(value) === false) {
+              throw new Error(USERS_MESSAGES.USERNAME_IS_INVALID) //trong message USERNAME_IS_INVALID: 'Username must be a string and length must be 4 - 15, and contain only letters, numbers, and underscores, not only numbers'
+            }
+            //tìm user bằng username
+            const user = await databaseService.users.findOne({
+              username: value
+            })
+            //nếu username đã tồn tại thì throw error
+            if (user) {
+              throw new Error(USERS_MESSAGES.USERNAME_ALREADY_EXISTS) //trong message USERNAME_ALREADY_EXISTS: 'Username already exists'
+            }
+            return true
+          }
         }
       },
       avatar: imageSchema,
@@ -518,34 +529,82 @@ export const updateMeValidator = validate(
     ['body']
   )
 )
+const userIdSchema: ParamSchema = {
+  custom: {
+    options: async (value: string, { req }) => {
+      //check value có phải objectId hay không?
+      if (!ObjectId.isValid(value)) {
+        throw new ErrorWithStatus({
+          message: USERS_MESSAGES.INVALID_user_id, //trong message.ts thêm INVALID_user_id: 'Invalid user id'followed user id'
+          status: HTTP_STATUS.NOT_FOUND
+        })
+      }
+      //đổi tên biến thành user luôn cho phù hợp
+      const user = await databaseService.users.findOne({
+        _id: new ObjectId(value)
+      })
+      if (user === null) {
+        throw new ErrorWithStatus({
+          message: USERS_MESSAGES.USER_NOT_FOUND, //fix lại cho nó thông báo chung
+          status: HTTP_STATUS.NOT_FOUND
+        })
+      }
+      //nếu vướt qua hết if thì return true
+      return true
+    }
+  }
+}
 export const followValidator = validate(
   checkSchema(
     {
-      followed_user_id: {
+      followed_user_id: userIdSchema
+    },
+    ['body']
+  )
+)
+//và thêm unfollowValidator
+export const unfollowValidator = validate(
+  checkSchema(
+    {
+      user_id: userIdSchema
+    },
+    ['params']
+  )
+)
+export const changePasswordValidator = validate(
+  checkSchema(
+    {
+      old_password: {
+        ...passwordSchema,
         custom: {
-          options: async (value: string, { req }) => {
-            //check value có phải objectId hay không?
-            if (!ObjectId.isValid(value)) {
-              throw new ErrorWithStatus({
-                message: USERS_MESSAGES.INVALID_FOLLOWED_USER_ID, //trong message.ts thêm INVALID_FOLLOWED_USER_ID: 'Invalid followed user id'
-                status: HTTP_STATUS.NOT_FOUND
-              })
-            }
-            //vào database tìm user đó xem có không ?
-            const followed_user = await databaseService.users.findOne({
-              _id: new ObjectId(value)
+          options: async (value, { req }) => {
+            //sau khi qua accestokenValidator thì ta đã có req.decoded_authorization chứa user_id
+            //lấy user_id đó để tìm user trong
+            const { user_id } = req.decoded_authorization as TokenPayload
+            const user = await databaseService.users.findOne({
+              _id: new ObjectId(user_id)
             })
-            if (followed_user === null) {
+            //nếu không có user thì throw error
+            if (!user) {
               throw new ErrorWithStatus({
-                message: USERS_MESSAGES.FOLLOWED_USER_NOT_FOUND, //trong message.ts thêm FOLLOWED_USER_NOT_FOUND: 'Followed user not found'
-                status: HTTP_STATUS.NOT_FOUND
+                message: USERS_MESSAGES.USER_NOT_FOUND,
+                status: HTTP_STATUS.UNAUTHORIZED //401
               })
             }
-            //nếu vướt qua hết if thì return true
-            return true
+            //nếu có user thì kiểm tra xem password có đúng không
+            const { password } = user
+            const isMatch = password === hashPassword(value)
+            if (!isMatch) {
+              throw new ErrorWithStatus({
+                message: USERS_MESSAGES.OLD_PASSWORD_NOT_MATCH, //trong messages.ts thêm OLD_PASSWORD_NOT_MATCH: 'Old password not match'
+                status: HTTP_STATUS.UNAUTHORIZED //401
+              })
+            }
           }
         }
-      }
+      },
+      password: passwordSchema,
+      confirm_password: confirmPasswordSchema
     },
     ['body']
   )
