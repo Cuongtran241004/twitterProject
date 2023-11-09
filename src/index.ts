@@ -6,7 +6,7 @@ import { defaultErrorHandler } from './middlewares/error.middlewares'
 import mediasRouter from './routes/medias.routes'
 import { initFolder } from './utils/file'
 import { config } from 'dotenv'
-import { UPLOAD_DIR } from './constants/dir'
+import { UPLOAD_IMAGE_DIR, UPLOAD_VIDEO_DIR } from './constants/dir'
 import staticRouter from './routes/static.routes'
 config()
 
@@ -28,7 +28,8 @@ app.use('/medias', mediasRouter)
 // app.use(express.static(UPLOAD_DIR)) //static file handler
 //nếu viết như vậy thì link dẫn sẽ là localhost:4000/blablabla.jpg
 app.use('/static', staticRouter)
-// app.use('/static', express.static(UPLOAD_DIR)) //k dùng cách 1 nữa nên cmt
+// app.use('/static', express.static(UPLOAD_VIDEO_DIR))
+//k dùng cách 1 nữa nên cmt
 
 // app sử dụng một error handler tổng
 // hạn chế dùng try catch khi gặp một lỗi bất kì
