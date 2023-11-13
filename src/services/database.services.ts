@@ -33,6 +33,12 @@ class DatabaseService {
     return this.db.collection(process.env.DB_COLLECTION_USERS as string)
   }
 
+  async indexUsers() {
+    await this.users.createIndex({ username: 1 }, { unique: true })
+    await this.users.createIndex({ email: 1 }, { unique: true })
+    await this.users.createIndex({ email: 1, password: 1 })
+  }
+
   // lấy data từ RefreshTokens, nếu chưa có thì tự mongodb tạo mới RefreshToken
   get refreshTokens(): Collection<RefreshToken> {
     return this.db.collection(process.env.DB_REFRESH_TOKENS_COLLECTION as string)
